@@ -20,19 +20,19 @@ namespace {
       double after;
 
       if(previousCallbackTime) {
-        after = duration_cast<duration<double>>(delay - after);
+        after = duration_cast<duration<double>>(delay - previousCallbackTime.count());
         if(after < 0) {
           after = duration_cast<duration<double>>(0.000001)
         }
       }
 
       if(async) {
-        std::thread([delay, task]() {
-          std::this_thread::sleep_for(std::chrono::microseconds(delay));
+        std::thread([after.count(), task]() {
+          std::this_thread::sleep_for(std::chrono::microseconds(after.count()));
           task();
         }).detach();
       } else {
-        std::this_thread::sleep_for(std::chrono::microseconds(delay));
+        std::this_thread::sleep_for(std::chrono::microseconds(after.count()));
         task();
       }
     }
@@ -51,13 +51,17 @@ namespace {
     void execute(void) {
       v8::Local<v8::Value> cb = callback.Call(0, 0)->Int32Value();
       Nan::Maybe<bool> result = Nan::To<bool>(cb);
+      if(result == true) {
+        point = std::chrono::high_resolution_clock::now();
+        previousCallbackTime = duration_cast<duration<double>>(start.count() + point.count());
+      }
     }
 
     info.GetReturnValue().SetUndefined();
   }
 
   void InitializeModule(Handle<Object> target) {
-
+    Nan::SetMethod(target, "schedule", schedule);
   }
 }
 
