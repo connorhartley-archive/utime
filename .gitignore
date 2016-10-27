@@ -1,4 +1,4 @@
-//this will affect all the git repos
+/this will affect all the git repos
 git config --global core.excludesfile ~/.gitignore
 
 
@@ -83,6 +83,10 @@ node_modules
 # Bower #
 #####################
 bower_components
+
+# NodeGYP #
+#####################
+build
 
 # TypeScript #
 #####################

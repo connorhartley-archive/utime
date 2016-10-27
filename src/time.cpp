@@ -1,15 +1,18 @@
+#include "v8.h"
+#include "node.h"
+#include "nan.h"
+
 #include <chrono>
+#include <ctime>
 #include <functional>
+#include <future>
 
 using namespace node;
 using namespace v8;
 
 namespace {
 
-  std::chrono::high_resolution_clock::time_point start = NULL;
-  std::chrono::high_resolution_clock::time_point point = NULL;
-
-  duration<double> previousCallbackTime = NULL;
+  std::chrono::duration<std::chrono::microseconds> previousCallbackTime;
 
   class scheduler {
   public:
@@ -20,9 +23,9 @@ namespace {
       double after;
 
       if(previousCallbackTime) {
-        after = duration_cast<duration<double>>(delay - previousCallbackTime.count());
+        after = std::chrono::duration_cast<std::chrono::duration<double>>(delay - previousCallbackTime.count());
         if(after < 0) {
-          after = duration_cast<duration<double>>(0.000001)
+          after = std::chrono::duration_cast<std::chrono::duration<double>>(0.000001)
         }
       }
 
@@ -41,23 +44,23 @@ namespace {
   NAN_METHOD(schedule) {
     Nan::HandleScope scope;
 
-    Nan::Callback callback(info[0].As<v8::Function>());
-    int delay = info[1]->Int64Value();
+    Nan::Callback *callback = new Nan::Callback(info[0].As<v8::Function>());
+    Nan::Maybe<int> delay = Nan::To<int>(info[1]);
 
-    start = std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-    scheduler scheduler_task(delay, false, &execute);
-
-    void execute(void) {
-      v8::Local<v8::Value> cb = callback.Call(0, 0)->Int32Value();
-      Nan::Maybe<bool> result = Nan::To<bool>(cb);
-      if(result == true) {
-        point = std::chrono::high_resolution_clock::now();
-        previousCallbackTime = duration_cast<duration<double>>(start.count() + point.count());
-      }
-    }
+    scheduler scheduler_task(delay, false, &task, callback, start);
 
     info.GetReturnValue().SetUndefined();
+  }
+
+  void task(Nan::Callback *callback, std::chrono::time_point start) {
+    Nan::Maybe<bool> cb = Nan::To<bool>(callback->Call(0, 0));
+    if(cb) {
+      std::chrono::high_resolution_clock::time_point point = std::chrono::high_resolution_clock::now();
+      previousCallbackTime = std::chrono::duration_cast<std::chrono::microseconds>(point - start);
+    }
+    return;
   }
 
   void InitializeModule(Handle<Object> target) {
